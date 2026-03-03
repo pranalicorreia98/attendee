@@ -28,10 +28,13 @@ def kill_child_processes():
         pass  # Process group may no longer exist
 
 
+_shutting_down = False
+
 @worker_shutting_down.connect
 def shutting_down_handler(sig, how, exitcode, **kwargs):
-    # Just adding this code so we can see how to shut down all the tasks
-    # when the main process is terminated.
-    # It's likely overkill.
+    global _shutting_down
+    if _shutting_down:
+        return
+    _shutting_down = True
     logger.info("Celery worker shutting down, sending SIGTERM to all child processes")
     kill_child_processes()

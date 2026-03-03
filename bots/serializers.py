@@ -957,7 +957,7 @@ class OutputVideoRequestSerializer(serializers.Serializer):
     )
 
     def validate_url(self, value: str) -> str:
-        if not value.startswith("https://"):
+        if not value.startswith(("http://", "https://")):
             raise serializers.ValidationError("URL must start with https://")
         if not value.endswith(".mp4"):
             raise serializers.ValidationError("URL must end with .mp4")
@@ -1134,7 +1134,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
             "properties": {
                 "url": {
                     "type": "string",
-                    "pattern": "^https://.*",
+                    "pattern": "^https?://.*",
                 },
                 "triggers": {
                     "type": "array",
@@ -1167,7 +1167,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
         "properties": {
             "zoom_tokens_url": {
                 "type": "string",
-                "pattern": "^https://.*",
+                "pattern": "^https?://.*",
             },
         },
         "required": [],
@@ -1185,7 +1185,7 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
 
         # Validate that zoom_tokens_url is a proper HTTPS URL
         zoom_tokens_url = value.get("zoom_tokens_url")
-        if zoom_tokens_url and not zoom_tokens_url.lower().startswith("https://"):
+        if zoom_tokens_url and not zoom_tokens_url.lower().startswith(("http://", "https://")):
             raise serializers.ValidationError({"zoom_tokens_url": "URL must start with https://"})
 
         return value
@@ -1236,12 +1236,12 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
 
         # Validate that url is a proper URL
         url = value.get("url")
-        if url and not url.lower().startswith("https://"):
+        if url and not url.lower().startswith(("http://", "https://")):
             raise serializers.ValidationError({"url": "URL must start with https://"})
 
         # Validate that screenshare_url is a proper URL
         screenshare_url = value.get("screenshare_url")
-        if screenshare_url and not screenshare_url.lower().startswith("https://"):
+        if screenshare_url and not screenshare_url.lower().startswith(("http://", "https://")):
             raise serializers.ValidationError({"screenshare_url": "URL must start with https://"})
 
         if not url_is_allowed_for_voice_agent(url):
@@ -1350,8 +1350,8 @@ class CreateBotSerializer(BotValidationMixin, serializers.Serializer):
         if "audio" in value and value.get("audio"):
             audio_url = value.get("audio", {}).get("url")
             if audio_url:
-                if not audio_url.lower().startswith("wss://"):
-                    raise serializers.ValidationError({"audio": {"url": "URL must start with wss://"}})
+                if not audio_url.lower().startswith(("ws://", "wss://")):
+                    raise serializers.ValidationError({"audio": {"url": "URL must start with ws:// or wss://"}})
 
         return value
 
@@ -1817,13 +1817,13 @@ class PatchBotVoiceAgentSettingsSerializer(serializers.Serializer):
 
     def validate_url(self, value):
         """Validate that url starts with https://"""
-        if value and not value.lower().startswith("https://"):
+        if value and not value.lower().startswith(("http://", "https://")):
             raise serializers.ValidationError("URL must start with https://")
         return value
 
     def validate_screenshare_url(self, value):
         """Validate that screenshare_url starts with https://"""
-        if value and not value.lower().startswith("https://"):
+        if value and not value.lower().startswith(("http://", "https://")):
             raise serializers.ValidationError("URL must start with https://")
         return value
 

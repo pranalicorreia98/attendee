@@ -63,7 +63,7 @@ RUN wget -q https://storage.googleapis.com/chrome-for-testing-public/134.0.6998.
 RUN apt-get update && apt-get install -y libasound2 libasound2-plugins alsa alsa-utils alsa-oss
 
 # Install Pulseaudio
-RUN apt-get install -y  pulseaudio pulseaudio-utils ffmpeg
+RUN apt-get update && apt-get install -y  pulseaudio pulseaudio-utils ffmpeg
 
 # Install Linux Kernel Dev
 RUN apt-get update && apt-get install -y linux-libc-dev
