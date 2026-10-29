@@ -1447,6 +1447,24 @@ class BotController:
         GLib.idle_add(lambda: self.take_action_based_on_voice_agent_settings_in_db())
 
     def on_new_participant_event(self, event):
+        if event.get("event_type") in ("camera_on", "camera_off"):
+            # Only for the realtime audio websocket consumer (the voice agent asks the
+            # candidate to turn their camera on). Not stored: ParticipantEvent.event_type
+            # is an integer enum.
+            if self.websocket_audio_client and self.websocket_audio_client.started():
+                self.websocket_audio_client.send_async(
+                    {
+                        "trigger": "participant_status",
+                        "bot_id": self.bot_in_db.object_id,
+                        "data": {
+                            "event": event["event_type"],
+                            "participant_uuid": event.get("participant_uuid"),
+                            "participant_name": event.get("event_data", {}).get("participant_name"),
+                            "timestamp_ms": event.get("timestamp_ms"),
+                        },
+                    }
+                )
+            return
         GLib.idle_add(lambda: self.add_participant_event(event))
 
     def add_participant_event(self, event):

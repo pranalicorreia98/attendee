@@ -26,6 +26,9 @@ from bots.models import ParticipantEventTypes
 
 logger = logging.getLogger(__name__)
 
+CAMERA_POLL_INTERVAL_SECONDS = 2
+CAMERA_STATUS_RESEND_POLLS = 5  # repeat the current camera state every 10s
+
 
 def generate_jwt(client_id, client_secret):
     iat = datetime.utcnow()
@@ -161,6 +164,9 @@ class ZoomBotAdapter(BotAdapter):
         self.active_sharer_source_id = None
 
         self._participant_cache = {}
+        # participant_id -> camera on? (polled — the SDK binding exposes no video-status callback)
+        self._participant_camera_on = {}
+        self._camera_poll_count = 0
 
         self.meeting_status = None
 
@@ -267,6 +273,42 @@ class ZoomBotAdapter(BotAdapter):
 
         for left_user_id in left_user_ids:
             self.send_participant_event(left_user_id, event_type=ParticipantEventTypes.LEAVE)
+
+    def poll_participant_cameras(self):
+        """Report camera on/off for every participant other than the bot.
+
+        Sends 'camera_on' / 'camera_off' when a camera changes, and repeats the current
+        state every CAMERA_STATUS_RESEND_POLLS polls so a consumer that connects late (the
+        realtime audio websocket starts with the first audio chunk) still learns it.
+        Returns True to keep the GLib timer running.
+        """
+        if self.requested_leave or self.cleaned_up or not self.participants_ctrl:
+            return False
+        try:
+            self._camera_poll_count += 1
+            resend = self._camera_poll_count % CAMERA_STATUS_RESEND_POLLS == 0
+            present = set()
+            for participant_id in self.participants_ctrl.GetParticipantsList():
+                if participant_id == self.my_participant_id:
+                    continue
+                user = self.participants_ctrl.GetUserByUserID(participant_id)
+                if not user:
+                    continue
+                present.add(participant_id)
+                camera_on = bool(user.IsVideoOn())
+                if resend or self._participant_camera_on.get(participant_id) != camera_on:
+                    self._participant_camera_on[participant_id] = camera_on
+                    self.send_participant_event(
+                        participant_id,
+                        "camera_on" if camera_on else "camera_off",
+                        {"participant_name": user.GetUserName()},
+                    )
+            for participant_id in list(self._participant_camera_on):
+                if participant_id not in present:
+                    del self._participant_camera_on[participant_id]
+        except Exception as e:
+            logger.warning(f"Error polling participant cameras: {e}")
+        return True
 
     def on_host_request_start_audio_callback(self, handler):
         logger.info("on_host_request_start_audio_callback called. Accepting request.")
@@ -584,6 +626,8 @@ class ZoomBotAdapter(BotAdapter):
         for participant_id in participant_ids_list:
             self.get_participant(participant_id)
             self.send_participant_event(participant_id, event_type=ParticipantEventTypes.JOIN)
+
+        GLib.timeout_add_seconds(CAMERA_POLL_INTERVAL_SECONDS, self.poll_participant_cameras)
 
         # Chats controller
         self.chat_ctrl = self.meeting_service.GetMeetingChatController()
